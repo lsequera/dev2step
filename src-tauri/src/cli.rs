@@ -50,9 +50,8 @@ pub fn handle_cli() -> Result<bool, String> {
 
     let cli = match Cli::try_parse() {
         Ok(c) => c,
-        Err(clap_error) => {
-            clap_error.print().unwrap();
-            return Err("CLI parsing failed".to_string());
+        Err(e) => {
+            e.exit();
         }
     };
 
@@ -112,11 +111,21 @@ pub fn handle_cli() -> Result<bool, String> {
             let status = TaskStatus::from_str(&to_lower);
             if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
                 task.status = status;
+                if status == TaskStatus::Done {
+                    task.is_completed = true;
+                    if task.completion_date.is_none() {
+                        task.completion_date = Some(chrono::Local::now().format("%Y-%m-%d").to_string());
+                    }
+                } else {
+                    task.is_completed = false;
+                    task.completion_date = None;
+                }
                 write_tasks_to_file(&todo_path, &tasks)?;
                 load_file_and_sync(&todo_path, &mut conn)?;
                 println!("Task #{} status updated to {}.", id, to);
             } else {
-                println!("Task #{} not found.", id);
+                eprintln!("Task #{} not found.", id);
+                return Err("Task not found".to_string());
             }
         }
         Commands::Complete { id } => {
@@ -128,7 +137,8 @@ pub fn handle_cli() -> Result<bool, String> {
                 load_file_and_sync(&todo_path, &mut conn)?;
                 println!("Task #{} marked completed.", id);
             } else {
-                println!("Task #{} not found.", id);
+                eprintln!("Task #{} not found.", id);
+                return Err("Task not found".to_string());
             }
         }
         Commands::Remove { id } => {
@@ -139,7 +149,8 @@ pub fn handle_cli() -> Result<bool, String> {
                 load_file_and_sync(&todo_path, &mut conn)?;
                 println!("Task #{} removed.", id);
             } else {
-                println!("Task #{} not found.", id);
+                eprintln!("Task #{} not found.", id);
+                return Err("Task not found".to_string());
             }
         }
     }
