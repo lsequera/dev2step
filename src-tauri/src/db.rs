@@ -5,6 +5,8 @@ use super::todo_parser::DevTask;
 pub fn init_db(db_path: &Path) -> Result<Connection, String> {
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
     
+    conn.execute("PRAGMA foreign_keys = ON;", []).map_err(|e| e.to_string())?;
+    
     conn.execute(
         "CREATE TABLE IF NOT EXISTS projects (
             id TEXT PRIMARY KEY,
@@ -28,7 +30,7 @@ pub fn init_db(db_path: &Path) -> Result<Connection, String> {
             parent_id INTEGER,
             line_number INTEGER NOT NULL,
             FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE SET NULL,
-            FOREIGN KEY(parent_id) REFERENCES tasks(id) ON DELETE SET NULL
+            FOREIGN KEY(parent_id) REFERENCES tasks(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED
         );",
         [],
     ).map_err(|e| e.to_string())?;
@@ -48,22 +50,24 @@ pub fn init_db(db_path: &Path) -> Result<Connection, String> {
     Ok(conn)
 }
 
-pub fn sync_tasks_to_db(conn: &Connection, tasks: &[DevTask]) -> Result<(), String> {
-    // Collect existing statuses before sync to detect transitions
-    let mut stmt = conn.prepare("SELECT id, status FROM tasks").map_err(|e| e.to_string())?;
-    let existing_statuses: std::collections::HashMap<u32, String> = stmt
-        .query_map([], |row| Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?)))
-        .map_err(|e| e.to_string())?
-        .filter_map(Result::ok)
-        .collect();
+pub fn sync_tasks_to_db(conn: &mut Connection, tasks: &[DevTask]) -> Result<(), String> {
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // Start transaction
-    conn.execute("BEGIN TRANSACTION", []).map_err(|e| e.to_string())?;
+    // Collect existing statuses before sync to detect transitions
+    let existing_statuses: std::collections::HashMap<u32, String> = {
+        let mut stmt = tx.prepare("SELECT id, status FROM tasks").map_err(|e| e.to_string())?;
+        let statuses = stmt
+            .query_map([], |row| Ok((row.get::<_, u32>(0)?, row.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?
+            .filter_map(Result::ok)
+            .collect();
+        statuses
+    };
 
     // 1. Upsert projects
     for task in tasks {
         if let Some(ref p) = task.project {
-            conn.execute(
+            tx.execute(
                 "INSERT OR IGNORE INTO projects (id, name) VALUES (?1, ?2)",
                 params![p, p],
             ).map_err(|e| e.to_string())?;
@@ -76,7 +80,7 @@ pub fn sync_tasks_to_db(conn: &Connection, tasks: &[DevTask]) -> Result<(), Stri
         active_ids.push(task.id);
         let status_str = task.status.to_str().to_string();
 
-        conn.execute(
+        tx.execute(
             "INSERT INTO tasks (id, priority, is_completed, completion_date, creation_date, description, project_id, status, due_date, parent_id, line_number)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
              ON CONFLICT(id) DO UPDATE SET
@@ -108,14 +112,14 @@ pub fn sync_tasks_to_db(conn: &Connection, tasks: &[DevTask]) -> Result<(), Stri
         // Check status change for history logging after task exists to satisfy FOREIGN KEY constraint
         if let Some(prev_status) = existing_statuses.get(&task.id) {
             if prev_status != &status_str {
-                conn.execute(
+                tx.execute(
                     "INSERT INTO state_history (task_id, from_status, to_status) VALUES (?1, ?2, ?3)",
                     params![task.id, prev_status, status_str],
                 ).map_err(|e| e.to_string())?;
             }
         } else {
             // New task insertion logs initial status transition
-            conn.execute(
+            tx.execute(
                 "INSERT INTO state_history (task_id, from_status, to_status) VALUES (?1, NULL, ?2)",
                 params![task.id, status_str],
             ).map_err(|e| e.to_string())?;
@@ -126,11 +130,11 @@ pub fn sync_tasks_to_db(conn: &Connection, tasks: &[DevTask]) -> Result<(), Stri
     if !active_ids.is_empty() {
         let id_list = active_ids.iter().map(|id| id.to_string()).collect::<Vec<String>>().join(",");
         let delete_query = format!("DELETE FROM tasks WHERE id NOT IN ({})", id_list);
-        conn.execute(&delete_query, []).map_err(|e| e.to_string())?;
+        tx.execute(&delete_query, []).map_err(|e| e.to_string())?;
     } else {
-        conn.execute("DELETE FROM tasks", []).map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM tasks", []).map_err(|e| e.to_string())?;
     }
 
-    conn.execute("COMMIT TRANSACTION", []).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
