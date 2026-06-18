@@ -50,7 +50,10 @@ pub fn handle_cli() -> Result<bool, String> {
 
     let cli = match Cli::try_parse() {
         Ok(c) => c,
-        Err(_) => return Ok(false), // Fallback if parsing fails
+        Err(clap_error) => {
+            clap_error.print().unwrap();
+            return Err("CLI parsing failed".to_string());
+        }
     };
 
     let (todo_path, db_path) = resolve_paths();
@@ -101,7 +104,12 @@ pub fn handle_cli() -> Result<bool, String> {
             println!("Task added successfully.");
         }
         Commands::Transition { id, to } => {
-            let status = TaskStatus::from_str(&to);
+            let to_lower = to.to_lowercase();
+            if to_lower != "icebox" && to_lower != "todo" && to_lower != "progress" && to_lower != "done" {
+                eprintln!("Invalid status. Choose from icebox, todo, progress, done");
+                return Err("Invalid status".to_string());
+            }
+            let status = TaskStatus::from_str(&to_lower);
             if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
                 task.status = status;
                 write_tasks_to_file(&todo_path, &tasks)?;
