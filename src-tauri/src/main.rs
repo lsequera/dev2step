@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 pub mod todo_parser;
+pub mod path_resolver;
+pub mod db;
 #[cfg(test)]
 pub mod todo_parser_tests;
 
