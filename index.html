@@ -1,43 +1,88 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
-    <script type="module" src="/src/main.ts" defer></script>
+    <title>Dev2Step Hub</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
-
   <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
+    <div class="glass-bg">
+      <header class="app-header">
+        <div class="logo">
+          <span class="pulse-icon"></span>
+          <h1>Dev2Step <span>hub</span></h1>
+        </div>
+        <div id="repo-path" class="path-badge">~/dev/my-project</div>
+        <button id="toggle-metrics-btn" class="btn-accent">Metrics [Ctrl + M]</button>
+      </header>
 
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/src/assets/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img
-            src="/src/assets/tauri.svg"
-            class="logo tauri"
-            alt="Tauri logo"
+      <main class="workspace">
+        <div class="omnibar-container">
+          <input 
+            type="text" 
+            id="omnibar" 
+            placeholder="Quick Add: Type description... use +project for tags, status:todo, (A) for priorities (Press '/' or 'N' to focus)"
+            autocomplete="off"
           />
-        </a>
-        <a href="https://www.typescriptlang.org/docs" target="_blank">
-          <img
-            src="/src/assets/typescript.svg"
-            class="logo typescript"
-            alt="typescript logo"
-          />
-        </a>
-      </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
+          <button id="add-btn">Add Task</button>
+        </div>
 
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
-    </main>
+        <div class="board">
+          <div class="column" data-status="icebox">
+            <div class="column-header">
+              <h3>Icebox</h3>
+              <span class="count">0</span>
+            </div>
+            <div class="column-body" id="col-icebox"></div>
+          </div>
+
+          <div class="column" data-status="todo">
+            <div class="column-header">
+              <h3>To Do</h3>
+              <span class="count" id="todo-count">0 / 5</span>
+            </div>
+            <div class="column-body" id="col-todo"></div>
+          </div>
+
+          <div class="column" data-status="progress">
+            <div class="column-header">
+              <h3>In Progress</h3>
+              <span class="count" id="progress-count">0 / 2</span>
+            </div>
+            <div class="column-body" id="col-progress"></div>
+          </div>
+
+          <div class="column" data-status="done">
+            <div class="column-header">
+              <h3>Done</h3>
+              <span class="count">0</span>
+            </div>
+            <div class="column-body" id="col-done"></div>
+          </div>
+        </div>
+      </main>
+
+      <aside id="metrics-panel" class="sidebar">
+        <div class="sidebar-header">
+          <h2>Metrics &amp; Throughput</h2>
+          <button id="close-metrics-btn">&times;</button>
+        </div>
+        <div class="sidebar-content">
+          <div class="metric-card">
+            <h4>Cycle Time (Progress to Done)</h4>
+            <p id="metric-cycle-time">0.0 days</p>
+          </div>
+          <div class="metric-card">
+            <h4>Status Distribution</h4>
+            <ul id="metric-distribution"></ul>
+          </div>
+        </div>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
