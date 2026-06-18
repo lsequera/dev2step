@@ -9,6 +9,7 @@ pub fn load_file_and_sync(todo_path: &Path, conn: &mut rusqlite::Connection) -> 
     if !todo_path.exists() {
         // Write empty file
         File::create(todo_path).map_err(|e| e.to_string())?;
+        sync_tasks_to_db(conn, &tasks)?;
         return Ok(tasks);
     }
 
@@ -46,6 +47,15 @@ pub fn load_file_and_sync(todo_path: &Path, conn: &mut rusqlite::Connection) -> 
         if task.id == 0 {
             max_id += 1;
             task.id = max_id;
+            needs_rewrite = true;
+        }
+    }
+
+    // Update physical line numbers to consecutive 1-indexed values
+    for (index, task) in tasks.iter_mut().enumerate() {
+        let expected_line = index + 1;
+        if task.line_number != expected_line {
+            task.line_number = expected_line;
             needs_rewrite = true;
         }
     }

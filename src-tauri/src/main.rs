@@ -7,6 +7,8 @@ pub mod db;
 pub mod sync;
 #[cfg(test)]
 pub mod todo_parser_tests;
+#[cfg(test)]
+pub mod sync_tests;
 
 fn main() {
     tauri_app_lib::run()
