@@ -11,12 +11,24 @@ pub fn start_file_watcher<R: tauri::Runtime>(
     todo_path: PathBuf,
     db_path: PathBuf,
 ) {
+    let todo_path_canonical = todo_path.canonicalize().unwrap_or_else(|_| todo_path.clone());
     let todo_path_clone = todo_path.clone();
     
     let mut watcher = RecommendedWatcher::new(
         move |res: Result<Event, notify::Error>| {
             if let Ok(event) = res {
                 if event.kind.is_modify() {
+                    let matches_todo = event.paths.iter().any(|p| {
+                        if let Ok(p_canon) = p.canonicalize() {
+                            p_canon == todo_path_canonical
+                        } else {
+                            p.file_name() == todo_path_canonical.file_name()
+                        }
+                    });
+                    if !matches_todo {
+                        return;
+                    }
+
                     // Check if we are ignoring self-writes
                     if let Ok(ignore) = IGNORE_WATCHER.lock() {
                         if *ignore {
