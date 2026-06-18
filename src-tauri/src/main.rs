@@ -6,6 +6,7 @@ pub mod path_resolver;
 pub mod db;
 pub mod sync;
 pub mod cli;
+pub mod watcher;
 #[cfg(test)]
 pub mod todo_parser_tests;
 #[cfg(test)]
