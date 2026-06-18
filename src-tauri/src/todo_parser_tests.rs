@@ -66,4 +66,50 @@ mod tests {
         assert_eq!(parsed.status, TaskStatus::Icebox);
         assert_eq!(parsed.parent_id, Some(103));
     }
+
+    #[test]
+    fn test_robust_date_validation() {
+        let raw = "some-w-rds Implement basic features";
+        let parsed = parse_line(raw, 4).unwrap();
+        // "some-w-rds" contains non-digits, so it should not be parsed as creation_date.
+        // It should default creation_date to today, and description should contain "some-w-rds".
+        assert_eq!(parsed.creation_date, chrono::Local::now().format("%Y-%m-%d").to_string());
+        assert!(parsed.description.contains("some-w-rds"));
+
+        let raw_comp = "x some-w-rds 2026-06-15 Implement basic features";
+        let parsed_comp = parse_line(raw_comp, 5).unwrap();
+        // "some-w-rds" contains non-digits, so it should not be parsed as completion_date.
+        // Since the first word after 'x' is not a date, it starts the description, and the subsequent "2026-06-15" is also part of the description.
+        assert_eq!(parsed_comp.completion_date, None);
+        assert_eq!(parsed_comp.creation_date, chrono::Local::now().format("%Y-%m-%d").to_string());
+        assert!(parsed_comp.description.contains("some-w-rds"));
+        assert!(parsed_comp.description.contains("2026-06-15"));
+    }
+
+    #[test]
+    fn test_malformed_ids_left_in_description() {
+        let raw = "Implement basic features id:abc parent:xyz id:123";
+        let parsed = parse_line(raw, 6).unwrap();
+        assert_eq!(parsed.id, 123);
+        assert_eq!(parsed.parent_id, None);
+        assert!(parsed.description.contains("id:abc"));
+        assert!(parsed.description.contains("parent:xyz"));
+
+        let raw_empty = "Implement basic features id: parent:";
+        let parsed_empty = parse_line(raw_empty, 7).unwrap();
+        assert_eq!(parsed_empty.id, 0);
+        assert_eq!(parsed_empty.parent_id, None);
+        assert!(parsed_empty.description.contains("id:"));
+        assert!(parsed_empty.description.contains("parent:"));
+    }
+
+    #[test]
+    fn test_multiple_projects() {
+        let raw = "Implement basic features +ProjA +ProjB +ProjC";
+        let parsed = parse_line(raw, 8).unwrap();
+        assert_eq!(parsed.project, Some("ProjA".to_string()));
+        assert!(parsed.description.contains("+ProjB"));
+        assert!(parsed.description.contains("+ProjC"));
+        assert!(!parsed.description.contains("+ProjA"));
+    }
 }

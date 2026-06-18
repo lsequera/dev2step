@@ -64,7 +64,17 @@ pub fn parse_line(line: &str, line_num: usize) -> Result<DevTask, String> {
     }
 
     let mut completion_date = None;
-    let date_pattern = |s: &str| s.len() == 10 && s.chars().nth(4) == Some('-') && s.chars().nth(7) == Some('-');
+    let date_pattern = |s: &str| {
+        if s.len() != 10 {
+            return false;
+        }
+        let bytes = s.as_bytes();
+        bytes[4] == b'-'
+            && bytes[7] == b'-'
+            && bytes[0..4].iter().all(|b| b.is_ascii_digit())
+            && bytes[5..7].iter().all(|b| b.is_ascii_digit())
+            && bytes[8..10].iter().all(|b| b.is_ascii_digit())
+    };
     
     if is_completed && !parts.is_empty() && date_pattern(parts[0]) {
         completion_date = Some(parts[0].to_string());
@@ -87,15 +97,27 @@ pub fn parse_line(line: &str, line_num: usize) -> Result<DevTask, String> {
 
     for word in parts {
         if word.starts_with('+') && word.len() > 1 {
-            project = Some(word[1..].to_string());
+            if project.is_none() {
+                project = Some(word[1..].to_string());
+            } else {
+                desc_words.push(word);
+            }
         } else if word.starts_with("status:") {
             status = TaskStatus::from_str(&word[7..]);
         } else if word.starts_with("due:") {
             due_date = Some(word[4..].to_string());
         } else if word.starts_with("id:") {
-            id = word[3..].parse::<u32>().ok();
+            if let Ok(parsed_id) = word[3..].parse::<u32>() {
+                id = Some(parsed_id);
+            } else {
+                desc_words.push(word);
+            }
         } else if word.starts_with("parent:") {
-            parent_id = word[7..].parse::<u32>().ok();
+            if let Ok(parsed_parent) = word[7..].parse::<u32>() {
+                parent_id = Some(parsed_parent);
+            } else {
+                desc_words.push(word);
+            }
         } else {
             desc_words.push(word);
         }
