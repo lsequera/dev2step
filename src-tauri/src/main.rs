@@ -14,12 +14,13 @@ pub mod todo_parser_tests;
 pub mod sync_tests;
 
 use std::path::PathBuf;
-use tauri::State;
+use std::time::Instant;
+use tauri::{State, Manager};
 use todo_parser::{DevTask, TaskStatus};
 use path_resolver::resolve_paths;
 use db::init_db;
 use sync::{load_file_and_sync, write_tasks_to_file};
-use watcher::IGNORE_WATCHER;
+use watcher::LAST_WRITE_TIME;
 
 struct AppState {
     todo_path: PathBuf,
@@ -43,11 +44,6 @@ async fn add_task(
     let mut conn = init_db(&state.db_path)?;
     let mut tasks = load_file_and_sync(&state.todo_path, &mut conn)?;
 
-    // Enforce ignore flag to prevent file watcher sync loop
-    if let Ok(mut ignore) = IGNORE_WATCHER.lock() {
-        *ignore = true;
-    }
-
     let max_id = tasks.iter().map(|t| t.id).max().unwrap_or(0);
     let pri_char = priority.and_then(|s| s.chars().next());
 
@@ -66,12 +62,11 @@ async fn add_task(
     };
 
     tasks.push(new_task);
+    if let Ok(mut last_write) = LAST_WRITE_TIME.lock() {
+        *last_write = Some(Instant::now());
+    }
     write_tasks_to_file(&state.todo_path, &tasks)?;
     let updated = load_file_and_sync(&state.todo_path, &mut conn)?;
-
-    if let Ok(mut ignore) = IGNORE_WATCHER.lock() {
-        *ignore = false;
-    }
 
     Ok(updated)
 }
@@ -85,10 +80,6 @@ async fn update_task_status(
     let mut conn = init_db(&state.db_path)?;
     let mut tasks = load_file_and_sync(&state.todo_path, &mut conn)?;
 
-    if let Ok(mut ignore) = IGNORE_WATCHER.lock() {
-        *ignore = true;
-    }
-
     let next_status = TaskStatus::from_str(&status);
     if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
         task.status = next_status;
@@ -99,14 +90,13 @@ async fn update_task_status(
             task.is_completed = false;
             task.completion_date = None;
         }
+        if let Ok(mut last_write) = LAST_WRITE_TIME.lock() {
+            *last_write = Some(Instant::now());
+        }
         write_tasks_to_file(&state.todo_path, &tasks)?;
     }
 
     let updated = load_file_and_sync(&state.todo_path, &mut conn)?;
-
-    if let Ok(mut ignore) = IGNORE_WATCHER.lock() {
-        *ignore = false;
-    }
 
     Ok(updated)
 }
@@ -116,17 +106,12 @@ async fn delete_task(state: State<'_, AppState>, id: u32) -> Result<Vec<DevTask>
     let mut conn = init_db(&state.db_path)?;
     let mut tasks = load_file_and_sync(&state.todo_path, &mut conn)?;
 
-    if let Ok(mut ignore) = IGNORE_WATCHER.lock() {
-        *ignore = true;
-    }
-
     tasks.retain(|t| t.id != id);
+    if let Ok(mut last_write) = LAST_WRITE_TIME.lock() {
+        *last_write = Some(Instant::now());
+    }
     write_tasks_to_file(&state.todo_path, &tasks)?;
     let updated = load_file_and_sync(&state.todo_path, &mut conn)?;
-
-    if let Ok(mut ignore) = IGNORE_WATCHER.lock() {
-        *ignore = false;
-    }
 
     Ok(updated)
 }

@@ -1,10 +1,10 @@
 use notify::{Watcher, RecursiveMode, Event, RecommendedWatcher};
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::Emitter;
 
-pub static IGNORE_WATCHER: Mutex<bool> = Mutex::new(false);
+pub static LAST_WRITE_TIME: Mutex<Option<Instant>> = Mutex::new(None);
 
 pub fn start_file_watcher<R: tauri::Runtime>(
     app_handle: tauri::AppHandle<R>,
@@ -30,9 +30,11 @@ pub fn start_file_watcher<R: tauri::Runtime>(
                     }
 
                     // Check if we are ignoring self-writes
-                    if let Ok(ignore) = IGNORE_WATCHER.lock() {
-                        if *ignore {
-                            return;
+                    if let Ok(last_write) = LAST_WRITE_TIME.lock() {
+                        if let Some(instant) = *last_write {
+                            if instant.elapsed() < Duration::from_millis(500) {
+                                return;
+                            }
                         }
                     }
 

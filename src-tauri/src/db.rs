@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection};
 use std::path::Path;
+use std::collections::HashSet;
 use super::todo_parser::DevTask;
 
 pub fn init_db(db_path: &Path) -> Result<Connection, String> {
@@ -52,6 +53,7 @@ pub fn init_db(db_path: &Path) -> Result<Connection, String> {
 
 pub fn sync_tasks_to_db(conn: &mut Connection, tasks: &[DevTask]) -> Result<(), String> {
     let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let valid_ids: HashSet<u32> = tasks.iter().map(|t| t.id).collect();
 
     // Collect existing statuses before sync to detect transitions
     let existing_statuses: std::collections::HashMap<u32, String> = {
@@ -104,7 +106,7 @@ pub fn sync_tasks_to_db(conn: &mut Connection, tasks: &[DevTask]) -> Result<(), 
                 task.project,
                 status_str,
                 task.due_date,
-                task.parent_id,
+                task.parent_id.and_then(|pid| if valid_ids.contains(&pid) { Some(pid) } else { None }),
                 task.line_number
             ],
         ).map_err(|e| e.to_string())?;
