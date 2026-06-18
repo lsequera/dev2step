@@ -4,6 +4,7 @@
 pub mod todo_parser;
 pub mod path_resolver;
 pub mod db;
+pub mod sync;
 #[cfg(test)]
 pub mod todo_parser_tests;
 
