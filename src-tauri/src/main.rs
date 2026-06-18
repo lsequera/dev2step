@@ -15,7 +15,7 @@ pub mod sync_tests;
 
 use std::path::PathBuf;
 use std::time::Instant;
-use tauri::{State, Manager};
+use tauri::State;
 use todo_parser::{DevTask, TaskStatus};
 use path_resolver::resolve_paths;
 use db::init_db;

@@ -110,7 +110,7 @@ pub fn handle_cli() -> Result<bool, String> {
             }
             let status = TaskStatus::from_str(&to_lower);
             if let Some(task) = tasks.iter_mut().find(|t| t.id == id) {
-                task.status = status;
+                task.status = status.clone();
                 if status == TaskStatus::Done {
                     task.is_completed = true;
                     if task.completion_date.is_none() {
