@@ -1,5 +1,5 @@
 {
-  "name": "tauri-app",
+  "name": "dev2step",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "tauri:build": "bash scripts/build-linux.sh"
   },
   "dependencies": {
     "@tauri-apps/api": "2.0.0",
